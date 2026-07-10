@@ -5,13 +5,10 @@
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <unistd.h>
-#include <sys/mman.h>
-#include <sys/syscall.h>
-#include <fcntl.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <stdio.h>
+#include <sys/mman.h>
 
 #ifndef MFD_CLOEXEC
 #define MFD_CLOEXEC 0x0001U
