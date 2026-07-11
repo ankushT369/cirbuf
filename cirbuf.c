@@ -28,7 +28,6 @@ struct bufmem {
     void* addr;
     size_t size;
     size_t usable;
-    size_t waste;
 };
 
 /* cirbuf represents the internal state 
@@ -37,7 +36,7 @@ struct cirbuf {
     bufmem mem;     // bufmem holds the actual address of the 
                     // memory location and also holds the other
                     // variables like size(virtual size), 
-                    // usable size and wasted size.
+                    // usable size.
 
     iter head;      // head points to the first element in the buffer
     iter tail;      // tail point to the last element in the buffer 
@@ -61,7 +60,7 @@ static void *cirbuf_get_block_addr(void *base, size_t index, size_t size) {
 }
 
 static size_t min_pages(size_t tot_size, size_t unit_page_size) {
-    return (tot_size +unit_page_size- 1) / unit_page_size;
+    return (tot_size + unit_page_size- 1) / unit_page_size;
 }
 
 static bufmem allocate_buffer(size_t page_nos, size_t datatype, size_t cap) {
@@ -69,7 +68,6 @@ static bufmem allocate_buffer(size_t page_nos, size_t datatype, size_t cap) {
         .addr = NULL,
         .size = 0,
         .usable = 0,
-        .waste = 0,
     };
     size_t pagesize = sysconf(_SC_PAGESIZE);
     size_t tot_phy_size = pagesize * page_nos;
@@ -139,7 +137,6 @@ static bufmem allocate_buffer(size_t page_nos, size_t datatype, size_t cap) {
         .addr = reserve,
         .size = tot_vir_size,
         .usable = cap * datatype,
-        .waste = tot_phy_size - (cap * datatype),
     };
 
     return mem;
@@ -155,7 +152,7 @@ cirbuf* cirbuf_create(size_t cap, size_t datatype) {
     cirbuf* cbuf = (cirbuf*)malloc(sizeof(cirbuf));
     if (cbuf == NULL) {
         e_buffer = (cirbuf){
-            .mem = (bufmem){NULL, 0, 0, 0},
+            .mem = (bufmem){NULL, 0, 0},
             .head = CIRBUF_EMPTY,
             .tail = CIRBUF_EMPTY,
             .len = 0,
@@ -170,7 +167,7 @@ cirbuf* cirbuf_create(size_t cap, size_t datatype) {
     if (datatype == 0 || cap > (SIZE_MAX / datatype)) {
         free(cbuf);
         e_buffer = (cirbuf){
-            .mem = (bufmem){NULL, 0, 0, 0},
+            .mem = (bufmem){NULL, 0, 0},
             .head = CIRBUF_EMPTY,
             .tail = CIRBUF_EMPTY,
             .len = 0,
@@ -187,7 +184,7 @@ cirbuf* cirbuf_create(size_t cap, size_t datatype) {
     if (mem.addr == NULL) {
         free(cbuf);
         e_buffer = (cirbuf){
-            .mem = (bufmem){NULL, 0, 0, 0},
+            .mem = (bufmem){NULL, 0, 0},
             .head = CIRBUF_EMPTY,
             .tail = CIRBUF_EMPTY,
             .len = 0,
@@ -296,7 +293,6 @@ void cirbuf_destroy(cirbuf *cbuf) {
         cbuf->mem.addr = NULL;
         cbuf->mem.size = 0;
         cbuf->mem.usable = 0;
-        cbuf->mem.waste = 0;
     }
 
     cbuf->status = -1;

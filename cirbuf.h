@@ -64,7 +64,7 @@ typedef size_t iter;
 
 /* API */
 cirbuf* cirbuf_create(size_t max, size_t datatype);
-void cirbuf_destroy(cirbuf* queue);
+void cirbuf_destroy(cirbuf* cbuf);
 
 void cirbuf_put(cirbuf* cbuf, void* data);
 void cirbuf_get(cirbuf* cbuf, void* buf);
@@ -74,9 +74,9 @@ void cirbuf_write(cirbuf* cbuf, void* data, size_t len);
 void cirbuf_read(cirbuf* cbuf, void* buf, size_t len);
 
 /* Utility functions */
-int cirbuf_is_ok(const cirbuf *q);
-int cirbuf_is_err(const cirbuf *q);
-int cirbuf_is_empty(const cirbuf* q);
+int cirbuf_is_ok(const cirbuf* cbuf);
+int cirbuf_is_err(const cirbuf* cbuf);
+int cirbuf_is_empty(const cirbuf* cbuf);
 
 
 #endif // CIRBUF_H
