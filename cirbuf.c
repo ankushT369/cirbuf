@@ -1,13 +1,13 @@
-/* A Fixed sized thread-safe circular buffer library in C 
+/* A Fixed sized not thread-safe circular buffer library in C 
  * Author: Ankush Mondal(ankushmondal1y2t@gmail.com) */
 #include "cirbuf.h"
 
 #define _GNU_SOURCE
 #include <stdio.h>
-#include <unistd.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/mman.h>
 
 #ifndef MFD_CLOEXEC
@@ -41,7 +41,6 @@ struct cirbuf {
     iter head;      // head points to the first element in the buffer
     iter tail;      // tail point to the last element in the buffer 
 
-    size_t len;
     size_t cap;
     size_t datatype;
 
@@ -155,7 +154,6 @@ cirbuf* cirbuf_create(size_t cap, size_t datatype) {
             .mem = (bufmem){NULL, 0, 0},
             .head = CIRBUF_EMPTY,
             .tail = CIRBUF_EMPTY,
-            .len = 0,
             .cap = 0,
             .datatype = 0,
             .status = -1,
@@ -170,7 +168,6 @@ cirbuf* cirbuf_create(size_t cap, size_t datatype) {
             .mem = (bufmem){NULL, 0, 0},
             .head = CIRBUF_EMPTY,
             .tail = CIRBUF_EMPTY,
-            .len = 0,
             .cap = 0,
             .datatype = 0,
             .status = -1,
@@ -187,7 +184,6 @@ cirbuf* cirbuf_create(size_t cap, size_t datatype) {
             .mem = (bufmem){NULL, 0, 0},
             .head = CIRBUF_EMPTY,
             .tail = CIRBUF_EMPTY,
-            .len = 0,
             .cap = 0,
             .datatype = 0,
             .status = -1,
@@ -200,7 +196,6 @@ cirbuf* cirbuf_create(size_t cap, size_t datatype) {
         .mem = mem,
         .head = CIRBUF_EMPTY,
         .tail = CIRBUF_EMPTY,
-        .len = 0,
         .cap = cap,
         .datatype = datatype,
         .status = 0,
@@ -216,14 +211,9 @@ cirbuf* cirbuf_create(size_t cap, size_t datatype) {
  * On error (NULL buffer or error state), it returns 
  * silently without any side effects. */
 void cirbuf_put(cirbuf *cbuf, void* data) {
-    if (!cbuf)
-        return;
+    if (!cbuf || cbuf == &e_buffer) return;
 
-    if (cbuf == &e_buffer)
-        return;
-
-    if (!data)
-        return;
+    if (!data) return;
 
     if (cbuf->head == CIRBUF_EMPTY && cbuf->tail == CIRBUF_EMPTY) {
         cbuf->head = 0;
@@ -240,9 +230,6 @@ void cirbuf_put(cirbuf *cbuf, void* data) {
         return;
 
     memcpy(addr, data, cbuf->datatype);
-
-    if (cbuf->len < cbuf->cap)
-        cbuf->len++;
 }
 
 /* cirbuf_get pops the oldest element from the front of 
@@ -253,15 +240,7 @@ void cirbuf_put(cirbuf *cbuf, void* data) {
  * On error (NULL buffer, NULL buf, or error state), 
  * it returns silently without any side effects. */
 void cirbuf_get(cirbuf *cbuf, void* buf) {
-    if (!cbuf || !buf) return;
-
-    if (cbuf == &e_buffer) return;
-
-    if (cbuf->len == 0) {
-        cbuf->head = CIRBUF_EMPTY;
-        cbuf->tail = CIRBUF_EMPTY;
-        return;
-    }
+    if (!cbuf || !buf || (cbuf == &e_buffer)) return;
 
     void* addr = cirbuf_get_block_addr(cbuf->mem.addr, cbuf->head, cbuf->datatype);
     if (addr == NULL) return;
@@ -272,10 +251,8 @@ void cirbuf_get(cirbuf *cbuf, void* buf) {
     if (cbuf->head == cbuf->tail) {
         cbuf->head = CIRBUF_EMPTY;
         cbuf->tail  = CIRBUF_EMPTY;
-        cbuf->len  = 0;
     } else {
         cbuf->head = (cbuf->head + 1) % cbuf->cap;
-        cbuf->len--;
     }
 
     return;
@@ -285,8 +262,7 @@ void cirbuf_get(cirbuf *cbuf, void* buf) {
  * structure. Safe to call on NULL or error buffers (no-op).
  * Setting status=-1 after free guards against double-free. */
 void cirbuf_destroy(cirbuf *cbuf) {
-    if (!cbuf) return;
-    if (cbuf->status) return;
+    if (!cbuf || cbuf->status) return;
 
     if (cbuf->mem.addr) {
         munmap(cbuf->mem.addr, cbuf->mem.size);
@@ -305,8 +281,4 @@ int cirbuf_is_ok(const cirbuf *cbuf) {
 
 int cirbuf_is_err(const cirbuf *cbuf) {
     return cbuf->status == 1;
-}
-
-int cirbuf_is_empty(const cirbuf* cbuf) {
-    return cbuf->len == 0;
 }

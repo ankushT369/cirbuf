@@ -1,2 +1,2 @@
 # cirbuf
-A Fixed sized thread-safe circular buffer library in C
+A Fixed sized not thread-safe circular buffer library in C

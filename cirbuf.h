@@ -1,4 +1,4 @@
-/* A Fixed sized thread-safe circular buffer library in C 
+/* A Fixed sized not thread-safe circular buffer library in C 
  * Author: Ankush Mondal(ankushmondal1y2t@gmail.com) */
 
 /*
@@ -76,7 +76,6 @@ void cirbuf_read(cirbuf* cbuf, void* buf, size_t len);
 /* Utility functions */
 int cirbuf_is_ok(const cirbuf* cbuf);
 int cirbuf_is_err(const cirbuf* cbuf);
-int cirbuf_is_empty(const cirbuf* cbuf);
 
 
 #endif // CIRBUF_H
