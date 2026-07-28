@@ -66,6 +66,25 @@ static size_t min_pages(size_t tot_size, size_t unit_page_size)
     return (tot_size + unit_page_size - 1) / unit_page_size;
 }
 
+/* Create an anonymous in-memory file.
+ * Reserve 2 copies of virtual address space
+ * which maps to same real address space.
+ *
+ *  +---+---+---+---+---+
+ *  | 0 | 1 | 2 | 3 | 4 | Virtual Memory (First Mapping)
+ *  +---+---+---+---+---+
+ *    |   |   |   |   |
+ *    v   v   v   v   v
+ *  +---+---+---+---+---+
+ *  | 0 | 1 | 2 | 3 | 4 | Shared Physical Memory
+ *  +---+---+---+---+---+
+ *    ^   ^   ^   ^   ^
+ *    |   |   |   |   |
+ *  +---+---+---+---+---+
+ *  | 0 | 1 | 2 | 3 | 4 | Virtual Memory (Second Mapping)
+ *  +---+---+---+---+---+
+ *
+ * */
 static bufmem allocate_buffer(size_t page_nos, size_t datatype, size_t cap)
 {
     bufmem mem = (bufmem){
@@ -77,14 +96,12 @@ static bufmem allocate_buffer(size_t page_nos, size_t datatype, size_t cap)
     size_t tot_phy_size = pagesize * page_nos;
     size_t tot_vir_size = tot_phy_size * 2;
 
-    // Validate that requested capacity fits
     if (cap * datatype > tot_phy_size)
     {
         fprintf(stderr, "Requested capacity exceeds physical memory\n");
         return mem;
     }
 
-    // Create an anonymous in-memory file
     int fd = memfd_create(MEM_FILE, MFD_CLOEXEC);
     if (fd == -1)
     {
@@ -99,7 +116,6 @@ static bufmem allocate_buffer(size_t page_nos, size_t datatype, size_t cap)
         return mem;
     }
 
-    // Reserve TWO pages of virtual address space
     void *reserve = mmap(NULL, tot_vir_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
     if (reserve == MAP_FAILED)
