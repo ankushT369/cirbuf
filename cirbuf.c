@@ -227,7 +227,7 @@ cirbuf *cirbuf_create(size_t cap, size_t datatype)
  * The element is deep-copied into the buffer using memcpy.
  * On error (NULL buffer or error state), it returns
  * silently without any side effects. */
-void cirbuf_put(cirbuf *cbuf, void *data)
+void cirbuf_put(cirbuf *cbuf, const void *data)
 {
     if (!cbuf || cbuf == &e_buffer)
         return;
@@ -314,5 +314,5 @@ int cirbuf_is_ok(const cirbuf *cbuf)
 
 int cirbuf_is_err(const cirbuf *cbuf)
 {
-    return cbuf->status == 1;
+    return cbuf->status == -1;
 }

@@ -66,7 +66,7 @@ typedef size_t iter;
 cirbuf *cirbuf_create(size_t max, size_t datatype);
 void cirbuf_destroy(cirbuf *cbuf);
 
-void cirbuf_put(cirbuf *cbuf, void *data);
+void cirbuf_put(cirbuf *cbuf, const void *data);
 void cirbuf_get(cirbuf *cbuf, void *buf);
 
 /* Bulk operations */
