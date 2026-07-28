@@ -1,4 +1,4 @@
-/* A Fixed sized not thread-safe circular buffer library in C 
+/* A Fixed sized circular buffer library in C
  * Author: Ankush Mondal(ankushmondal1y2t@gmail.com) */
 
 /*
@@ -10,7 +10,7 @@
  *      buffer = []
  *      head=EMPTY  tail=EMPTY  len=0
  *
- *      
+ *
  *      // put(9), put(4), put(3)
  *
  *      [9]  [4]  [3]  [?]
@@ -63,19 +63,18 @@ typedef struct cirbuf cirbuf;
 typedef size_t iter;
 
 /* API */
-cirbuf* cirbuf_create(size_t max, size_t datatype);
-void cirbuf_destroy(cirbuf* cbuf);
+cirbuf *cirbuf_create(size_t max, size_t datatype);
+void cirbuf_destroy(cirbuf *cbuf);
 
-void cirbuf_put(cirbuf* cbuf, void* data);
-void cirbuf_get(cirbuf* cbuf, void* buf);
+void cirbuf_put(cirbuf *cbuf, void *data);
+void cirbuf_get(cirbuf *cbuf, void *buf);
 
 /* Bulk operations */
-void cirbuf_write(cirbuf* cbuf, void* data, size_t len);
-void cirbuf_read(cirbuf* cbuf, void* buf, size_t len);
+void cirbuf_write(cirbuf *cbuf, void *data, size_t len);
+void cirbuf_read(cirbuf *cbuf, void *buf, size_t len);
 
 /* Utility functions */
-int cirbuf_is_ok(const cirbuf* cbuf);
-int cirbuf_is_err(const cirbuf* cbuf);
-
+int cirbuf_is_ok(const cirbuf *cbuf);
+int cirbuf_is_err(const cirbuf *cbuf);
 
 #endif // CIRBUF_H
