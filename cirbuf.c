@@ -71,7 +71,7 @@ static size_t min_pages(size_t tot_size, size_t unit_page_size)
  * which maps to same real address space.
  *
  *  +---+---+---+---+---+
- *  | 0 | 1 | 2 | 3 | 4 | Virtual Memory (First Mapping)
+ *  | 0 | 1 | 2 | 3 | 4 | Virtual Memory (First Mapping 0 - 4)
  *  +---+---+---+---+---+
  *    |   |   |   |   |
  *    v   v   v   v   v
@@ -81,10 +81,10 @@ static size_t min_pages(size_t tot_size, size_t unit_page_size)
  *    ^   ^   ^   ^   ^
  *    |   |   |   |   |
  *  +---+---+---+---+---+
- *  | 0 | 1 | 2 | 3 | 4 | Virtual Memory (Second Mapping)
+ *  | 5 | 6 | 7 | 8 | 9 | Virtual Memory (Second Mapping 5 - 9)
  *  +---+---+---+---+---+
  *
- * */
+ **/
 static bufmem allocate_buffer(size_t page_nos, size_t datatype, size_t cap)
 {
     bufmem mem = (bufmem){
