@@ -59,6 +59,10 @@
 #define CIRBUF_EMPTY SIZE_MAX
 #define MEM_FILE "cirbuf"
 
+/* branch prediction hints macro */
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 typedef struct cirbuf cirbuf;
 typedef size_t iter;
 

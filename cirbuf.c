@@ -3,6 +3,7 @@
 #include "cirbuf.h"
 
 #define _GNU_SOURCE
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,8 +41,8 @@ struct cirbuf
                 // variables like size(virtual size),
                 // usable size.
 
-    iter head; // head points to the first element in the buffer
-    iter tail; // tail point to the last element in the buffer
+    iter head; // iterator head points to the first element in the buffer
+    iter tail; // iterator tail point to the last element in the buffer
 
     size_t cap;
     size_t datatype;
@@ -50,20 +51,30 @@ struct cirbuf
                 // on error it will be -1
 };
 
+/* Helper function */
+static inline bool is_mul_overflow(size_t a, size_t b, size_t *result)
+{
+    return __builtin_mul_overflow(a, b, result);
+}
+
 static void *cirbuf_get_block_addr(void *base, size_t index, size_t size)
 {
     if (base == NULL)
         return NULL;
 
-    if (size == 0 || index > SIZE_MAX / size)
+    size_t offset;
+    if (is_mul_overflow(index, size, &offset))
         return NULL;
 
-    return (char *)base + index * size;
+    return (char *)base + offset;
 }
 
 static size_t min_pages(size_t tot_size, size_t unit_page_size)
 {
-    return (tot_size + unit_page_size - 1) / unit_page_size;
+    if (tot_size == 0)
+        return 0;
+
+    return 1 + (tot_size - 1) / unit_page_size;
 }
 
 /* Create an anonymous in-memory file.
@@ -87,16 +98,49 @@ static size_t min_pages(size_t tot_size, size_t unit_page_size)
  **/
 static bufmem allocate_buffer(size_t page_nos, size_t datatype, size_t cap)
 {
+    size_t pagesize;
+    size_t tot_phy_size;
+    size_t tot_vir_size;
+    size_t usable;
+
     bufmem mem = (bufmem){
         .addr = NULL,
         .size = 0,
         .usable = 0,
     };
-    size_t pagesize = sysconf(_SC_PAGESIZE);
-    size_t tot_phy_size = pagesize * page_nos;
-    size_t tot_vir_size = tot_phy_size * 2;
 
-    if (cap * datatype > tot_phy_size)
+    if (!page_nos || !datatype || !cap)
+    {
+        return mem;
+    }
+
+    long ps = sysconf(_SC_PAGESIZE);
+    if (ps == -1)
+    {
+        perror("sysconf");
+        return mem;
+    }
+    pagesize = (size_t)ps;
+
+    if (is_mul_overflow(pagesize, page_nos, &tot_phy_size))
+    {
+        fprintf(stderr, "Physical size overflow\n");
+        return mem;
+    }
+
+    if (is_mul_overflow(tot_phy_size, 2, &tot_vir_size))
+    {
+        fprintf(stderr, "Physical size overflow\n");
+        return mem;
+    }
+
+    if (is_mul_overflow(cap, datatype, &usable))
+    {
+        fprintf(stderr, "Usable size overflow\n");
+        return mem;
+    }
+
+    if (usable > tot_phy_size)
     {
         fprintf(stderr, "Requested capacity exceeds physical memory\n");
         return mem;
@@ -113,33 +157,36 @@ static bufmem allocate_buffer(size_t page_nos, size_t datatype, size_t cap)
     if (ftruncate(fd, tot_phy_size) == -1)
     {
         perror("ftruncate");
+        close(fd);
         return mem;
     }
 
     void *reserve = mmap(NULL, tot_vir_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
     if (reserve == MAP_FAILED)
     {
         perror("reserve");
+        close(fd);
         return mem;
     }
 
     // Map the file into the FIRST half
     void *first = mmap(reserve, tot_phy_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
-
     if (first == MAP_FAILED)
     {
         perror("first mmap");
+        close(fd);
+        munmap(reserve, tot_vir_size);
         return mem;
     }
 
     // Map the SAME file into the SECOND half
     void *second =
         mmap((char *)reserve + tot_phy_size, tot_phy_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
-
     if (second == MAP_FAILED)
     {
         perror("second mmap");
+        close(fd);
+        munmap(reserve, tot_vir_size);
         return mem;
     }
 
@@ -148,7 +195,7 @@ static bufmem allocate_buffer(size_t page_nos, size_t datatype, size_t cap)
     mem = (bufmem){
         .addr = reserve,
         .size = tot_vir_size,
-        .usable = cap * datatype,
+        .usable = usable,
     };
 
     return mem;
@@ -160,7 +207,8 @@ static bufmem allocate_buffer(size_t page_nos, size_t datatype, size_t cap)
  * cirbuf_destroy(). */
 cirbuf *cirbuf_create(size_t cap, size_t datatype)
 {
-    size_t pagesize = sysconf(_SC_PAGESIZE);
+    size_t pagesize;
+    size_t usable;
 
     cirbuf *cbuf = (cirbuf *)malloc(sizeof(cirbuf));
     if (cbuf == NULL)
@@ -177,7 +225,15 @@ cirbuf *cirbuf_create(size_t cap, size_t datatype)
         return &e_buffer;
     }
 
-    if (datatype == 0 || cap > (SIZE_MAX / datatype))
+    long ps = sysconf(_SC_PAGESIZE);
+    if (ps == -1)
+    {
+        perror("sysconf");
+        free(cbuf);
+    }
+    pagesize = (size_t)ps;
+
+    if (datatype == 0 || is_mul_overflow(cap, datatype, &usable))
     {
         free(cbuf);
         e_buffer = (cirbuf){
@@ -192,7 +248,7 @@ cirbuf *cirbuf_create(size_t cap, size_t datatype)
         return &e_buffer;
     }
 
-    size_t pages = min_pages(cap * datatype, pagesize);
+    size_t pages = min_pages(usable, pagesize);
     bufmem mem = allocate_buffer(pages, datatype, cap);
     if (mem.addr == NULL)
     {
