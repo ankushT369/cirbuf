@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <assert.h>
 #include <unistd.h>
 
 #ifndef MFD_CLOEXEC
@@ -51,17 +52,28 @@ struct cirbuf
                 // on error it will be -1
 };
 
-/* Helper function */
+/* Helper functions */
 static inline bool is_mul_overflow(size_t a, size_t b, size_t *result)
 {
     return __builtin_mul_overflow(a, b, result);
 }
 
+static cirbuf *cirbuf_error(void)
+{
+    e_buffer = (cirbuf){
+        .mem = {NULL, 0, 0},
+        .head = CIRBUF_EMPTY,
+        .tail = CIRBUF_EMPTY,
+        .cap = 0,
+        .datatype = 0,
+        .status = -1,
+    };
+
+    return &e_buffer;
+}
+
 static void *cirbuf_get_block_addr(void *base, size_t index, size_t size)
 {
-    if (base == NULL)
-        return NULL;
-
     size_t offset;
     if (is_mul_overflow(index, size, &offset))
         return NULL;
@@ -96,12 +108,11 @@ static size_t min_pages(size_t tot_size, size_t unit_page_size)
  *  +---+---+---+---+---+
  *
  **/
-static bufmem allocate_buffer(size_t page_nos, size_t datatype, size_t cap)
+static bufmem allocate_buffer(size_t page_nos, size_t usable)
 {
     size_t pagesize;
     size_t tot_phy_size;
     size_t tot_vir_size;
-    size_t usable;
 
     bufmem mem = (bufmem){
         .addr = NULL,
@@ -109,7 +120,7 @@ static bufmem allocate_buffer(size_t page_nos, size_t datatype, size_t cap)
         .usable = 0,
     };
 
-    if (!page_nos || !datatype || !cap)
+    if (!page_nos || !usable)
     {
         return mem;
     }
@@ -130,13 +141,7 @@ static bufmem allocate_buffer(size_t page_nos, size_t datatype, size_t cap)
 
     if (is_mul_overflow(tot_phy_size, 2, &tot_vir_size))
     {
-        fprintf(stderr, "Physical size overflow\n");
-        return mem;
-    }
-
-    if (is_mul_overflow(cap, datatype, &usable))
-    {
-        fprintf(stderr, "Usable size overflow\n");
+        fprintf(stderr, "Virtual size overflow\n");
         return mem;
     }
 
@@ -212,57 +217,29 @@ cirbuf *cirbuf_create(size_t cap, size_t datatype)
 
     cirbuf *cbuf = (cirbuf *)malloc(sizeof(cirbuf));
     if (cbuf == NULL)
-    {
-        e_buffer = (cirbuf){
-            .mem = (bufmem){NULL, 0, 0},
-            .head = CIRBUF_EMPTY,
-            .tail = CIRBUF_EMPTY,
-            .cap = 0,
-            .datatype = 0,
-            .status = -1,
-        };
-
-        return &e_buffer;
-    }
+        return cirbuf_error();
 
     long ps = sysconf(_SC_PAGESIZE);
     if (ps == -1)
     {
         perror("sysconf");
         free(cbuf);
+        return cirbuf_error();
     }
     pagesize = (size_t)ps;
 
     if (datatype == 0 || is_mul_overflow(cap, datatype, &usable))
     {
         free(cbuf);
-        e_buffer = (cirbuf){
-            .mem = (bufmem){NULL, 0, 0},
-            .head = CIRBUF_EMPTY,
-            .tail = CIRBUF_EMPTY,
-            .cap = 0,
-            .datatype = 0,
-            .status = -1,
-        };
-
-        return &e_buffer;
+        return cirbuf_error();
     }
 
     size_t pages = min_pages(usable, pagesize);
-    bufmem mem = allocate_buffer(pages, datatype, cap);
+    bufmem mem = allocate_buffer(pages, usable);
     if (mem.addr == NULL)
     {
         free(cbuf);
-        e_buffer = (cirbuf){
-            .mem = (bufmem){NULL, 0, 0},
-            .head = CIRBUF_EMPTY,
-            .tail = CIRBUF_EMPTY,
-            .cap = 0,
-            .datatype = 0,
-            .status = -1,
-        };
-
-        return &e_buffer;
+        return cirbuf_error();
     }
 
     *cbuf = (cirbuf){
@@ -320,8 +297,9 @@ void cirbuf_put(cirbuf *cbuf, const void *data)
  * it returns silently without any side effects. */
 void cirbuf_get(cirbuf *cbuf, void *buf)
 {
-    if (!cbuf || !buf || (cbuf == &e_buffer))
-        return;
+    assert(cbuf);
+    assert(buf);
+    assert(cbuf == &e_buffer);
 
     void *addr = cirbuf_get_block_addr(cbuf->mem.addr, cbuf->head, cbuf->datatype);
     if (addr == NULL)
@@ -352,23 +330,17 @@ void cirbuf_destroy(cirbuf *cbuf)
         return;
 
     if (cbuf->mem.addr)
-    {
         munmap(cbuf->mem.addr, cbuf->mem.size);
-        cbuf->mem.addr = NULL;
-        cbuf->mem.size = 0;
-        cbuf->mem.usable = 0;
-    }
 
-    cbuf->status = -1;
     free(cbuf);
 }
 
 int cirbuf_is_ok(const cirbuf *cbuf)
 {
-    return cbuf->status == 0;
+    return cbuf && cbuf->status == 0;
 }
 
 int cirbuf_is_err(const cirbuf *cbuf)
 {
-    return cbuf->status == -1;
+    return cbuf && cbuf->status == -1;
 }
