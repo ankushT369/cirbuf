@@ -3,13 +3,13 @@
 #include "cirbuf.h"
 
 #define _GNU_SOURCE
+#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <assert.h>
 #include <unistd.h>
 
 #ifndef MFD_CLOEXEC
